@@ -145,15 +145,30 @@ static uint32_t hashString(const char* key, int length) {
 }
 //< Hash Tables hash-string
 //> take-string
-ObjString* makeString(int length) {
+ObjString* makeString(bool hasChars, const char* Chars, int length) {
+//no longer use length + 1; - null
+    ObjString* newStrng = (ObjString*)allocateObject(sizeof(ObjString), OBJ_STRING);// allocates memory for new string object, stores in newStrng
+
+    // records new information inside the newStrng object
+    newStrng->hasChars = hasChars;//boolean
+    newStrng->length = length;// stores length
+    newStrng->Chars=Chars;// has pointer for string
+    newStrng->hash = hashString(Chars, length);//calculates hash
+
+    return newStrng;
+
+
+
+
+
 // fcn allocates memory and length
 //sizeOf(Objstring) - size of structure
-    size_t sizeBytes = sizeof(ObjString) + length + 1;// how much memory to allocate
+    //size_t sizeBytes = sizeof(ObjString) + length + 1;// how much memory to allocate
 
 // use inside here
-    Obj* objPointer = allocateObject(sizeBytes, OBJ_STRING);// returns obj pointer and allocates memory for new string obj
-    ((ObjString*)objPointer)-> length = length;//converts object pointer to ObjString pointer and stores length
-    return ((ObjString*)objPointer);
+    //Obj* objPointer = allocateObject(sizeBytes, OBJ_STRING);// returns obj pointer and allocates memory for new string obj
+    //((ObjString*)objPointer)-> length = length;//converts object pointer to ObjString pointer and stores length
+    //return ((ObjString*)objPointer);
 ///////////////////////////////////////////////////////////////////////
 //code from before :
 /* Strings take-string < Hash Tables take-string-hash
@@ -177,26 +192,28 @@ ObjString* copyString(const char* chars, int length) {
 
 ////////////////////////////////////////////////////////////////////////////////
 //> Hash Tables copy-string-hash
-  uint32_t hash = hashString(chars, length);
+  uint32_t hash = hashString(chars, length);//calculate hash
 //> copy-string-intern
   ObjString* interned = tableFindString(&vm.strings, chars, length, hash);
   if (interned != NULL) return interned;
-
-  ObjString* newString = makeString(length);// makes string obj and allocates memory
 //< copy-string-intern
 //< Hash Tables copy-string-hash
 //  char* heapChars = ALLOCATE(char, length + 1);
-    newString->hash = hash;
+
 //  memcpy(heapChars, chars, length);
 //memcpy(destination - where we want the characters, source, number of bytes/ length )
-    memcpy(newString->Char, chars, length);
+    //memcpy(newString->Char, chars, length);
 //  heapChars[length] = '\0';
-    newString->Char[length] = '\0';// null terminator at end of array
-
-
+    //newString->Char[length] = '\0';// null terminator at end of array
+    int totalLength = length + 1;//memory length
+    char* hChar = ALLOCATE(char, totalLength);//allocation of memory
+    memcpy(hChar, chars, length);//copies to new memory hChars
+    hChar[length] = '\0';//null at the end
+    ObjString* newString = makeString(true, hChar, length);// makes string obj and allocates memory
+    newString->hash = hash;// stores hash in new string object
     push(OBJ_VAL(newString));
-    tableSet(&vm.strings, newString, NIL_VAL);
-    pop();
+    tableSet(&vm.strings, newString, NIL_VAL);//adding new string to VM string table
+    pop();// remove from stack
     return newString;
 /* Strings object-c < Hash Tables copy-string-allocate
   return allocateString(heapChars, length);
@@ -226,7 +243,7 @@ static void printFunction(ObjFunction* function) {
     return;
   }
 //< print-script
-  printf("<fn %s>", function->name->Char);
+  printf("<fn %s>", function->name->Chars);
 }
 //< Calls and Functions print-function-helper
 //> print-object
@@ -239,7 +256,7 @@ void printObject(Value value) {
 //< Methods and Initializers print-bound-method
 //> Classes and Instances print-class
     case OBJ_CLASS:
-      printf("%s", AS_CLASS(value)->name->Char);
+      printf("%s", AS_CLASS(value)->name->Chars);
       break;
 //< Classes and Instances print-class
 //> Closures print-closure
@@ -255,7 +272,7 @@ void printObject(Value value) {
 //> Classes and Instances print-instance
     case OBJ_INSTANCE:
       printf("%s instance",
-             AS_INSTANCE(value)->klass->name->Char);
+             AS_INSTANCE(value)->klass->name->Chars);
       break;
 //< Classes and Instances print-instance
 //> Calls and Functions print-native
@@ -263,9 +280,12 @@ void printObject(Value value) {
       printf("<native fn>");
       break;
 //< Calls and Functions print-native
-    case OBJ_STRING:
-      printf("%s", AS_CSTRING(value));
+    case OBJ_STRING: {
+      int getLength = AS_STRING(value)->length;// gets length of a string
+      const char* point = AS_CSTRING(value);// gets address and stores in pointer
+      printf("%.*s",getLength, point);// prints # of characters
       break;
+      }
 //> Closures print-upvalue
     case OBJ_UPVALUE:
       printf("upvalue");

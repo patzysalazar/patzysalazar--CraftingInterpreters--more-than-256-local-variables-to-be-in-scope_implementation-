@@ -217,9 +217,16 @@ static void freeObject(Obj* object) {
 //< Calls and Functions free-native
     case OBJ_STRING: {
       ObjString* string = (ObjString*)object;//obj pointer to ObjString pointer
-      size_t sizeBytes = sizeof(ObjString) + string-> length + 1;//calculates number of bytes
-      FREE_ARRAY(char, object, sizeBytes);// frees allocation
-      //FREE(ObjString, object);
+
+      //size_t sizeBytes = sizeof(ObjString) + string-> length + 1;//calculates number of bytes
+
+      if(string->hasChars == true){
+      char* charact = (char*)string->Chars;// gets charater pointer
+      int totalLength = string->length +1;// length + null terminator = total length
+
+      FREE_ARRAY(char, charact, totalLength);// frees allocation
+      }
+      FREE(ObjString, object);
       break;
     }
 //> Closures free-upvalue

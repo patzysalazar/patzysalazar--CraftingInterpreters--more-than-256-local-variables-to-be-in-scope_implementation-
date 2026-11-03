@@ -80,6 +80,14 @@ bool valuesEqual(Value a, Value b) {
   if (IS_NUMBER(a) && IS_NUMBER(b)) {
     return AS_NUMBER(a) == AS_NUMBER(b);
   }
+  if(IS_STRING(a) && IS_STRING(b)){
+    ObjString* aString = AS_STRING(a);
+    ObjString* bString = AS_STRING(b);
+    // checks if both strings have the same length and if the characters match
+    return aString->length == bString->length && memcmp(aString->Chars, bString->Chars, aString->length) == 0;
+
+
+  }
 //< nan-equality
   return a == b;
 #else

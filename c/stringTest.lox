@@ -1,0 +1,5 @@
+var greeting = "Hello";
+print greeting;
+print greeting + " World";
+print "Cat" == "Cat";
+print "Cat" == "Dog";

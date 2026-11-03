@@ -58,7 +58,7 @@
     (((ObjNative*)AS_OBJ(value))->function)
 //< Calls and Functions as-native
 #define AS_STRING(value)       ((ObjString*)AS_OBJ(value))
-#define AS_CSTRING(value)      (((ObjString*)AS_OBJ(value))->Char)
+#define AS_CSTRING(value)      (((ObjString*)AS_OBJ(value))->Chars)
 //< as-string
 //> obj-type
 
@@ -125,7 +125,8 @@ struct ObjString {
   int length;
   uint32_t hash;
   //char* chars;
-  char Char[];// for flexible array
+  bool hasChars;
+  const char* Chars;// for flexible array
 //> Hash Tables obj-string-hash
 
 //< Hash Tables obj-string-hash
@@ -203,7 +204,7 @@ ObjNative* newNative(NativeFn function);
 //ObjString* takeString(char* chars, int length);
 //< take-string-h
 //> copy-string-h
-ObjString* makeString(int length);
+ObjString* makeString(bool hasChars, const char* Chars, int length);
 ObjString* copyString(const char* chars, int length);
 //> Closures new-upvalue-h
 ObjUpvalue* newUpvalue(Value* slot);
