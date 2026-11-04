@@ -28,12 +28,12 @@ void freeTable(Table* table) {
 // If you change it here, make sure to update that copy.
 //< omit
 static Entry* findEntry(Entry* entries, int capacity,
-                        ObjString* key) {
+                        Value key) {
 /* Hash Tables find-entry < Optimization initial-index
   uint32_t index = key->hash % capacity;
 */
 //> Optimization initial-index
-  uint32_t index = key->hash & (capacity - 1);
+  uint32_t index = hashValue(key) & (capacity - 1);//calculate hash based on type
 //< Optimization initial-index
 //> find-entry-tombstone
   Entry* tombstone = NULL;
@@ -47,7 +47,7 @@ static Entry* findEntry(Entry* entries, int capacity,
     }
 */
 //> find-tombstone
-    if (entry->key == NULL) {
+    if (IS_EMPTY(entry->key)) {
       if (IS_NIL(entry->value)) {
         // Empty entry.
         return tombstone != NULL ? tombstone : entry;
@@ -55,7 +55,7 @@ static Entry* findEntry(Entry* entries, int capacity,
         // We found a tombstone.
         if (tombstone == NULL) tombstone = entry;
       }
-    } else if (entry->key == key) {
+    } else if (valuesEqual(key, entry->key)) {
       // We found the key.
       return entry;
     }
@@ -71,22 +71,26 @@ static Entry* findEntry(Entry* entries, int capacity,
 }
 //< find-entry
 //> table-get
-bool tableGet(Table* table, ObjString* key, Value* value) {
+bool tableGet(Table* table, Value key, Value* value) {
   if (table->count == 0) return false;
 
   Entry* entry = findEntry(table->entries, table->capacity, key);
-  if (entry->key == NULL) return false;
+  if (IS_EMPTY(entry->key) ) {
+  return false;
+  }
+    else{
+        *value = entry->value;
+        return true;
+    }
 
-  *value = entry->value;
-  return true;
 }
 //< table-get
 //> table-adjust-capacity
 static void adjustCapacity(Table* table, int capacity) {
   Entry* entries = ALLOCATE(Entry, capacity);
   for (int i = 0; i < capacity; i++) {
-    entries[i].key = NULL;
-    entries[i].value = NIL_VAL;
+    entries[i].key = EMPTY_VAL;//empty bucket
+    entries[i].value = NIL_VAL;// deleted bucket
   }
 //> re-hash
 
@@ -95,7 +99,7 @@ static void adjustCapacity(Table* table, int capacity) {
 //< resize-init-count
   for (int i = 0; i < table->capacity; i++) {
     Entry* entry = &table->entries[i];
-    if (entry->key == NULL) continue;
+    if (IS_EMPTY(entry->key)) continue;
 
     Entry* dest = findEntry(entries, capacity, entry->key);
     dest->key = entry->key;
@@ -114,7 +118,7 @@ static void adjustCapacity(Table* table, int capacity) {
 }
 //< table-adjust-capacity
 //> table-set
-bool tableSet(Table* table, ObjString* key, Value value) {
+bool tableSet(Table* table, Value key, Value value) {
 //> table-set-grow
   if (table->count + 1 > table->capacity * TABLE_MAX_LOAD) {
     int capacity = GROW_CAPACITY(table->capacity);
@@ -123,7 +127,15 @@ bool tableSet(Table* table, ObjString* key, Value value) {
 
 //< table-set-grow
   Entry* entry = findEntry(table->entries, table->capacity, key);
-  bool isNewKey = entry->key == NULL;
+  bool isNewKey;
+  if(IS_EMPTY(entry-> key)){//if bucket empty
+    isNewKey = true;
+  }
+  else{
+    isNewKey = false;//if bucket contains key
+  }
+
+
 /* Hash Tables table-set < Hash Tables set-increment-count
   if (isNewKey) table->count++;
 */
@@ -137,26 +149,35 @@ bool tableSet(Table* table, ObjString* key, Value value) {
 }
 //< table-set
 //> table-delete
-bool tableDelete(Table* table, ObjString* key) {
+bool tableDelete(Table* table, Value key) {
   if (table->count == 0) return false;
 
   // Find the entry.
   Entry* entry = findEntry(table->entries, table->capacity, key);
-  if (entry->key == NULL) return false;
-
+  if (IS_EMPTY(entry->key)){// if key empty in hash
+    return false;// no deletion necessary, nothing was deleted
+  }
+  else{
   // Place a tombstone in the entry.
-  entry->key = NULL;
-  entry->value = BOOL_VAL(true);
-  return true;
+    entry->key = EMPTY_VAL;
+    entry->value = BOOL_VAL(true);
+    return true;
+  }
+
+
 }
 //< table-delete
 //> table-add-all
-void tableAddAll(Table* from, Table* to) {
+void tableAddAll(Table* from, Table* to) {//copies hash table entries to other hash
   for (int i = 0; i < from->capacity; i++) {
     Entry* entry = &from->entries[i];
-    if (entry->key != NULL) {
-      tableSet(to, entry->key, entry->value);
+    if (IS_EMPTY(entry->key)) {
+      continue;
     }
+    else{
+        tableSet(to, entry->key, entry->value);
+    }
+
   }
 }
 //< table-add-all
@@ -173,14 +194,12 @@ ObjString* tableFindString(Table* table, const char* chars,
 //< Optimization find-string-index
   for (;;) {
     Entry* entry = &table->entries[index];
-    if (entry->key == NULL) {
+    if (IS_EMPTY(entry->key)) {
       // Stop if we find an empty non-tombstone entry.
       if (IS_NIL(entry->value)) return NULL;
-    } else if (entry->key->length == length &&
-        entry->key->hash == hash &&
-        memcmp(entry->key->Chars, chars, length) == 0) {
+    } else if (IS_STRING(entry->key)&&AS_STRING(entry->key)->length == length && AS_STRING(entry->key)->hash == hash &&memcmp(AS_STRING(entry->key)->Chars, chars, length) == 0) {
       // We found it.
-      return entry->key;
+      return AS_STRING(entry->key);
     }
 
 /* Hash Tables table-find-string < Optimization find-string-next
@@ -196,7 +215,9 @@ ObjString* tableFindString(Table* table, const char* chars,
 void tableRemoveWhite(Table* table) {
   for (int i = 0; i < table->capacity; i++) {
     Entry* entry = &table->entries[i];
-    if (entry->key != NULL && !entry->key->obj.isMarked) {
+    //!IS_EMPTY(entry->key) - checks if key
+    //!AS_STRING(entry->key)->obj.isMarked - checks if string unmarked in garbage collection
+    if (!IS_EMPTY(entry->key) && !AS_STRING(entry->key)->obj.isMarked) {
       tableDelete(table, entry->key);
     }
   }
@@ -206,7 +227,8 @@ void tableRemoveWhite(Table* table) {
 void markTable(Table* table) {
   for (int i = 0; i < table->capacity; i++) {
     Entry* entry = &table->entries[i];
-    markObject((Obj*)entry->key);
+    if(IS_EMPTY(entry->key)) continue;
+    markValue(entry->key);
     markValue(entry->value);
   }
 }

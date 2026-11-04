@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "table.h"
 
 //< Scanning on Demand main-includes
 #include "common.h"
@@ -82,7 +83,10 @@ int main(int argc, const char* argv[]) {
 //> A Virtual Machine main-init-vm
   initVM();
 
-//< A Virtual Machine main-init-vm
+
+  //> Chunks of Bytecode main-c
+  //> Scanning on Demand main-includes
+
 /* Chunks of Bytecode main-chunk < Scanning on Demand args
   Chunk chunk;
   initChunk(&chunk);

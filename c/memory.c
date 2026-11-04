@@ -92,6 +92,8 @@ static void markArray(ValueArray* array) {
     markValue(array->values[i]);
   }
 }
+
+
 //< Garbage Collection mark-array
 //> Garbage Collection blacken-object
 static void blackenObject(Obj* object) {

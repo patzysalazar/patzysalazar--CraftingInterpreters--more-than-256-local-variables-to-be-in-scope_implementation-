@@ -29,6 +29,11 @@ typedef struct ObjString ObjString;
 #define TAG_NIL   1 // 01.
 #define TAG_FALSE 2 // 10.
 #define TAG_TRUE  3 // 11.
+#define TAG_EMPTY 4// empty hash table bucket, use below
+
+#define EMPTY_VAL (QNAN | TAG_EMPTY)// empty bucket - QNAN: non number values
+#define IS_EMPTY(val) ((val) ==(QNAN | TAG_EMPTY))// checks if value is equal to bit pattern
+
 //< tags
 
 typedef uint64_t Value;
@@ -101,8 +106,10 @@ typedef enum {
   VAL_NIL, // [user-types]
   VAL_NUMBER,
 //> Strings val-obj
-  VAL_OBJ
+  VAL_OBJ,
 //< Strings val-obj
+
+  VAL_EMPTY
 } ValueType;
 
 //< Types of Values value-type
@@ -129,6 +136,7 @@ typedef struct {
 //> Strings is-obj
 #define IS_OBJ(value)     ((value).type == VAL_OBJ)
 //< Strings is-obj
+#define IS_EMPTY(val)     ((val).type == VAL_EMPTY)
 //< Types of Values is-macros
 //> Types of Values as-macros
 
@@ -145,6 +153,8 @@ typedef struct {
 #define NUMBER_VAL(value) ((Value){VAL_NUMBER, {.number = value}})
 //> Strings obj-val
 #define OBJ_VAL(object)   ((Value){VAL_OBJ, {.obj = (Obj*)object}})
+
+#define EMPTY_VAL         ((Value){VAL_EMPTY, {. number = 0}})// makes Value with VAL_EMPTY type representing empty hash bucket
 //< Strings obj-val
 //< Types of Values value-macros
 //> Optimization end-if-nan-boxing
@@ -163,6 +173,7 @@ typedef struct {
 
 //> Types of Values values-equal-h
 bool valuesEqual(Value a, Value b);
+uint64_t hashValue(Value value);
 //< Types of Values values-equal-h
 void initValueArray(ValueArray* array);
 void writeValueArray(ValueArray* array, Value value);

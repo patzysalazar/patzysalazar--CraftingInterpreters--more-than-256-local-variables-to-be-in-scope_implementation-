@@ -124,7 +124,7 @@ static ObjString* allocateString(char* Char, int length) {
 
 //  push(OBJ_VAL(string));
 //< Garbage Collection push-string
-//  tableSet(&vm.strings, string, NIL_VAL);
+//  tableSet(&vm.strings, OBJ_VAL(string), NIL_VAL);
 //> Garbage Collection pop-string
 //  pop();
 
@@ -212,7 +212,7 @@ ObjString* copyString(const char* chars, int length) {
     ObjString* newString = makeString(true, hChar, length);// makes string obj and allocates memory
     newString->hash = hash;// stores hash in new string object
     push(OBJ_VAL(newString));
-    tableSet(&vm.strings, newString, NIL_VAL);//adding new string to VM string table
+    tableSet(&vm.strings, OBJ_VAL(newString), NIL_VAL);//adding new string to VM string table
     pop();// remove from stack
     return newString;
 /* Strings object-c < Hash Tables copy-string-allocate
@@ -283,6 +283,7 @@ void printObject(Value value) {
     case OBJ_STRING: {
       int getLength = AS_STRING(value)->length;// gets length of a string
       const char* point = AS_CSTRING(value);// gets address and stores in pointer
+      //printf("debug length: %d\n", getLength);
       printf("%.*s",getLength, point);// prints # of characters
       break;
       }

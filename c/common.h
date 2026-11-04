@@ -11,7 +11,7 @@
 #define NAN_BOXING
 //< Optimization define-nan-boxing
 //> Compiling Expressions define-debug-print-code
-#define DEBUG_PRINT_CODE
+//#define DEBUG_PRINT_CODE
 //< Compiling Expressions define-debug-print-code
 #define DEBUG_TRACE_EXECUTION
 //< A Virtual Machine define-debug-trace

@@ -711,7 +711,7 @@ static void string(bool canAssign) {
 //< Global Variables string
   int length = parser.previous.length - 2; // gets length of string with no quotation marks
   const char* start = parser.previous.start + 1;// -> starting position of string
-  emitConstant(OBJ_VAL(makeString(false, start, length)));// makes new string object
+  emitConstant(OBJ_VAL(copyString( start, length)));// makes new string object
 }
 //< Strings parse-string
 /* Global Variables read-named-variable < Global Variables named-variable-signature
