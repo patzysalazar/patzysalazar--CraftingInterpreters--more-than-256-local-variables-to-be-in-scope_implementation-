@@ -16,7 +16,7 @@
 #define DEBUG_TRACE_EXECUTION
 //< A Virtual Machine define-debug-trace
 //> Garbage Collection define-stress-gc
-
+#define DEBUG_PRINT_CODE
 #define DEBUG_STRESS_GC
 //< Garbage Collection define-stress-gc
 //> Garbage Collection define-log-gc

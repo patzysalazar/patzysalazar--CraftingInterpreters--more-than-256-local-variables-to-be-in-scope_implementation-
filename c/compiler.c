@@ -7,6 +7,8 @@
 #include <string.h>
 //< Local Variables compiler-include-string
 
+#include "table.h"
+
 #include "common.h"
 #include "compiler.h"
 //> Garbage Collection compiler-include-memory
@@ -113,6 +115,7 @@ typedef struct Compiler {
   Upvalue upvalues[UINT8_COUNT];
 //< Closures upvalues-array
   int scopeDepth;
+  Table identifierTable;
 } Compiler;
 //< Local Variables compiler-struct
 //> Methods and Initializers class-compiler-struct
@@ -132,6 +135,7 @@ Compiler* current = NULL;
 //< Local Variables current-compiler
 //> Methods and Initializers current-class
 ClassCompiler* currentClass = NULL;
+//Table identifierTable;//has identifier names and constant table indexes
 //< Methods and Initializers current-class
 //> Compiling Expressions compiling-chunk
 /* Compiling Expressions compiling-chunk < Calls and Functions current-chunk
@@ -310,6 +314,7 @@ static void initCompiler(Compiler* compiler, FunctionType type) {
   compiler->function = newFunction();
 //< Calls and Functions init-function
   current = compiler;
+  initTable(&compiler->identifierTable);
 //> Calls and Functions init-function-name
   if (type != TYPE_SCRIPT) {
     current->function->name = copyString(parser.previous.start,
@@ -366,6 +371,8 @@ static ObjFunction* endCompiler() {
 //< dump-chunk
 //> Calls and Functions return-function
 
+
+freeTable(&current->identifierTable);// frees identifier hash table
 //> restore-enclosing
   current = current->enclosing;
 //< restore-enclosing
@@ -414,8 +421,22 @@ static void parsePrecedence(Precedence precedence);
 //< Compiling Expressions forward-declarations
 //> Global Variables identifier-constant
 static uint8_t identifierConstant(Token* name) {
-  return makeConstant(OBJ_VAL(copyString(name->start,
-                                         name->length)));
+ // return makeConstant(OBJ_VAL(copyString(name->start, name->length))); - no more duplicate names in the compiler
+ // we change this section
+    Value existingIndex;// variable to store index if the identifier exists
+
+    // - tableGet(hash table(where to search), identifier(what you want to search in hash table), where to save index saved if identifier found)
+    if(tableGet(&current->identifierTable, OBJ_VAL(copyString(name->start, name->length)), &existingIndex)){
+    // if identifier exists, take identifier table index and turn to 8 bit integer
+        return (uint8_t)AS_NUMBER(existingIndex);
+
+    }
+    else{// if identifier does not exist, make new constant
+        uint8_t newIndex =  makeConstant(OBJ_VAL(copyString(name->start, name->length))); //makes constant from identifier name, adds to constant table and returns the index
+        tableSet(&current->identifierTable, OBJ_VAL(copyString(name->start, name->length)), NUMBER_VAL(newIndex));
+
+        return newIndex;// returns index of new constant
+    }
 }
 //< Global Variables identifier-constant
 //> Local Variables identifiers-equal
@@ -1507,6 +1528,7 @@ ObjFunction* compile(const char* source) {
 
   parser.hadError = false;
   parser.panicMode = false;
+  //initTable(&identifierTable);//initializes hash table for compilation
 
 //< init-parser-error
   advance();
@@ -1530,6 +1552,7 @@ ObjFunction* compile(const char* source) {
 */
 //> Calls and Functions call-end-compiler
   ObjFunction* function = endCompiler();
+  //freeTable(&current->identifierTable);// frees table after compilation
   return parser.hadError ? NULL : function;
 //< Calls and Functions call-end-compiler
 }
