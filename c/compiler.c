@@ -22,7 +22,8 @@
 #endif
 //< Compiling Expressions include-debug
 //> Compiling Expressions parser
-
+Table finalGlobalVar;
+bool FinaltableInit = false;
 typedef struct {
   Token current;
   Token previous;
@@ -69,11 +70,12 @@ typedef struct {
 //< parse-rule
 //> Local Variables local-struct
 
-typedef struct {
+typedef struct {//local struct
   Token name;
   int depth;
 //> Closures is-captured-field
   bool isCaptured;
+  bool isFinal;
 //< Closures is-captured-field
 } Local;
 //< Local Variables local-struct
@@ -81,6 +83,7 @@ typedef struct {
 typedef struct {
   uint8_t index;
   bool isLocal;
+  bool isFinal;
 } Upvalue;
 //< Closures upvalue-struct
 //> Calls and Functions function-type-enum
@@ -327,6 +330,8 @@ static void initCompiler(Compiler* compiler, FunctionType type) {
   local->depth = 0;
 //> Closures init-zero-local-is-captured
   local->isCaptured = false;
+  local->isFinal = false;
+
 //< Closures init-zero-local-is-captured
 /* Calls and Functions init-function-slot < Methods and Initializers slot-zero
   local->name.start = "";
@@ -464,7 +469,7 @@ static int resolveLocal(Compiler* compiler, Token* name) {
 //< Local Variables resolve-local
 //> Closures add-upvalue
 static int addUpvalue(Compiler* compiler, uint8_t index,
-                      bool isLocal) {
+                      bool isLocal, bool isFinal) {
   int upvalueCount = compiler->function->upvalueCount;
 //> existing-upvalue
 
@@ -485,6 +490,8 @@ static int addUpvalue(Compiler* compiler, uint8_t index,
 //< too-many-upvalues
   compiler->upvalues[upvalueCount].isLocal = isLocal;
   compiler->upvalues[upvalueCount].index = index;
+  compiler->upvalues[upvalueCount].isFinal = isFinal;
+
   return compiler->function->upvalueCount++;
 }
 //< Closures add-upvalue
@@ -497,13 +504,13 @@ static int resolveUpvalue(Compiler* compiler, Token* name) {
 //> mark-local-captured
     compiler->enclosing->locals[local].isCaptured = true;
 //< mark-local-captured
-    return addUpvalue(compiler, (uint8_t)local, true);
+    return addUpvalue(compiler, (uint8_t)local, true, compiler->enclosing->locals[local].isFinal);
   }
 
 //> resolve-upvalue-recurse
   int upvalue = resolveUpvalue(compiler->enclosing, name);
   if (upvalue != -1) {
-    return addUpvalue(compiler, (uint8_t)upvalue, false);
+    return addUpvalue(compiler, (uint8_t)upvalue, false, compiler->enclosing->locals[local].isFinal);
   }
   
 //< resolve-upvalue-recurse
@@ -529,6 +536,8 @@ static void addLocal(Token name) {
 //< declare-undefined
 //> Closures init-is-captured
   local->isCaptured = false;
+  local->isFinal = false;
+
 //< Closures init-is-captured
 }
 //< Local Variables add-local
@@ -772,6 +781,29 @@ static void namedVariable(Token name, bool canAssign) {
 */
 //> named-variable-can-assign
   if (canAssign && match(TOKEN_EQUAL)) {
+    if(setOp == OP_SET_LOCAL){// if local variable assignment
+        if(current->locals[arg].isFinal){//if variable final
+            error("cannot change/assign new value to a local final variable");//compile time error
+
+        }
+    }
+    else if( setOp == OP_SET_UPVALUE){// if variable assignment from outer fcn
+        if(current->upvalues[arg].isFinal){// if variable final
+            error("can't change final outer variable by inner functions");
+        }
+    }
+    else if(setOp == OP_SET_GLOBAL){//if global variable assignment
+        Value result;// store lox value
+        ObjString* varName = copyString(name.start, name.length);//copy name
+        //if variable name in hash table found, store value(true) saved in result
+        if(tableGet(&finalGlobalVar, OBJ_VAL(varName), &result)){
+            error("cannot change/assign new value to a global final variable");//compile time error
+
+        }
+
+
+
+    }
 //< named-variable-can-assign
     expression();
 /* Global Variables named-variable < Local Variables emit-set
@@ -1240,6 +1272,28 @@ static void varDeclaration() {
 
   defineVariable(global);
 }
+static void finalDeclaration() {// like varDeclaration fuction - declaring local final variables
+  uint8_t global = parseVariable("Expect variable name.");// get variable name
+  int scope = current->scopeDepth;
+  if(scope > 0){//if compiler processing code inside local scope
+    current->locals[current->localCount - 1].isFinal = true; //mark as final
+  }
+  else{
+    ObjString* varName = copyString(parser.previous.start, parser.previous.length);// pointer of string that has var name
+    tableSet(&finalGlobalVar, OBJ_VAL(varName), BOOL_VAL(true));// stores var name as key , then true as value
+
+  }
+
+  if (match(TOKEN_EQUAL)) {
+    expression();
+  } else {
+    emitByte(OP_NIL);
+  }
+  consume(TOKEN_SEMICOLON,
+          "Expect ';' after variable declaration.");
+
+  defineVariable(global);
+}
 //< Global Variables var-declaration
 //> Global Variables expression-statement
 static void expressionStatement() {
@@ -1262,7 +1316,12 @@ static void forStatement() {
     // No initializer.
   } else if (match(TOKEN_VAR)) {
     varDeclaration();
-  } else {
+  }
+  else if (match(TOKEN_FINAL)){// compiler recognizes final as a variable declaration
+    finalDeclaration();
+  }
+
+  else {
     expressionStatement();
   }
 //< for-initializer
@@ -1438,7 +1497,11 @@ static void declaration() {
 //< Calls and Functions match-fun
 //> match-var
     varDeclaration();
-  } else {
+  }
+   else if (match(TOKEN_FINAL)){
+   finalDeclaration();
+   }
+   else {
     statement();
   }
 //< match-var
@@ -1511,6 +1574,14 @@ ObjFunction* compile(const char* source) {
     if (token.type == TOKEN_EOF) break;
   }
 */
+if(FinaltableInit == false){
+    initTable(&finalGlobalVar);//initializes the final var hash table
+    FinaltableInit = true;
+}
+
+Table savedFinalGlobals;
+initTable(&savedFinalGlobals);
+tableAddAll(&finalGlobalVar, &savedFinalGlobals);
 //> Local Variables compiler
   Compiler compiler;
 //< Local Variables compiler
@@ -1552,8 +1623,21 @@ ObjFunction* compile(const char* source) {
 */
 //> Calls and Functions call-end-compiler
   ObjFunction* function = endCompiler();
+
+  if(!parser.hadError){//if no compilation error
+    freeTable(&savedFinalGlobals);// no backup table
+    return function;
+  }
+  else{// if compilation error
+    freeTable(&finalGlobalVar);// frees hash table storage
+    finalGlobalVar = savedFinalGlobals;
+    return NULL;
+  }
+
+
+
   //freeTable(&current->identifierTable);// frees table after compilation
-  return parser.hadError ? NULL : function;
+ // return parser.hadError ? NULL : function;
 //< Calls and Functions call-end-compiler
 }
 //> Garbage Collection mark-compiler-roots
