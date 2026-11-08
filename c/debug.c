@@ -66,6 +66,18 @@ static int byteInstruction(const char* name, Chunk* chunk,
   printf("%-16s %4d\n", name, slot);
   return offset + 2; // [debug]
 }
+// name - instruction name ex OP_SET_LOCAL_LONG
+//offset - position of instruction in array bytecode
+static int longLocalInstruction(const char* name, Chunk* chunk, int offset){// display new long instructions
+    long indexPos = chunk->code[offset + 1];// reads first byte of var's position
+    indexPos = (indexPos * 256) + chunk->code[offset + 2];// reads second byte and adds first byte to represent one local variable postion greater than 255
+// instruction name , local var stack position
+    printf("%-16s %4ld\n", name, indexPos);
+    return offset + 3;// returns the following bytecode instruction position
+
+}
+
+
 //< Local Variables byte-instruction
 //> Jumping Back and Forth jump-instruction
 static int jumpInstruction(const char* name, int sign,
@@ -115,6 +127,19 @@ int disassembleInstruction(Chunk* chunk, int offset) {
       return byteInstruction("OP_GET_LOCAL", chunk, offset);
     case OP_SET_LOCAL:
       return byteInstruction("OP_SET_LOCAL", chunk, offset);
+
+    //case OP_GET_LOCAL:
+      //return byteInstruction("OP_GET_LOCAL_LONG", chunk, offset);//debugger recognizing instruction
+    //case OP_SET_LOCAL:
+      //return byteInstruction("OP_SET_LOCAL_LONG", chunk, offset);
+
+    case OP_GET_LOCAL_LONG:
+      return longLocalInstruction("OP_GET_LOCAL_LONG", chunk, offset);//debugger recognizing instruction
+    case OP_SET_LOCAL_LONG:
+      return longLocalInstruction("OP_SET_LOCAL_LONG", chunk, offset);
+
+
+
 //< Local Variables disassemble-local
 //> Global Variables disassemble-get-global
     case OP_GET_GLOBAL:
@@ -211,6 +236,7 @@ int disassembleInstruction(Chunk* chunk, int offset) {
       for (int j = 0; j < function->upvalueCount; j++) {
         int isLocal = chunk->code[offset++];
         int index = chunk->code[offset++];
+        index = (index * 256) + chunk->code[offset++];
         printf("%04d      |                     %s %d\n",
                offset - 2, isLocal ? "local" : "upvalue", index);
       }

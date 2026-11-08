@@ -81,7 +81,7 @@ typedef struct {//local struct
 //< Local Variables local-struct
 //> Closures upvalue-struct
 typedef struct {
-  uint8_t index;
+  uint16_t index;
   bool isLocal;
   bool isFinal;
 } Upvalue;
@@ -112,7 +112,7 @@ typedef struct Compiler {
   FunctionType type;
 
 //< Calls and Functions function-fields
-  Local locals[UINT8_COUNT];
+  Local locals[1000];
   int localCount;
 //> Closures upvalues-array
   Upvalue upvalues[UINT8_COUNT];
@@ -468,7 +468,7 @@ static int resolveLocal(Compiler* compiler, Token* name) {
 }
 //< Local Variables resolve-local
 //> Closures add-upvalue
-static int addUpvalue(Compiler* compiler, uint8_t index,
+static int addUpvalue(Compiler* compiler, uint16_t index,
                       bool isLocal, bool isFinal) {
   int upvalueCount = compiler->function->upvalueCount;
 //> existing-upvalue
@@ -504,13 +504,13 @@ static int resolveUpvalue(Compiler* compiler, Token* name) {
 //> mark-local-captured
     compiler->enclosing->locals[local].isCaptured = true;
 //< mark-local-captured
-    return addUpvalue(compiler, (uint8_t)local, true, compiler->enclosing->locals[local].isFinal);
+    return addUpvalue(compiler, (uint16_t)local, true, compiler->enclosing->locals[local].isFinal);
   }
 
 //> resolve-upvalue-recurse
   int upvalue = resolveUpvalue(compiler->enclosing, name);
   if (upvalue != -1) {
-    return addUpvalue(compiler, (uint8_t)upvalue, false, compiler->enclosing->locals[local].isFinal);
+    return addUpvalue(compiler, (uint16_t)upvalue, false, compiler->enclosing->upvalues[upvalue].isFinal);
   }
   
 //< resolve-upvalue-recurse
@@ -520,7 +520,7 @@ static int resolveUpvalue(Compiler* compiler, Token* name) {
 //> Local Variables add-local
 static void addLocal(Token name) {
 //> too-many-locals
-  if (current->localCount == UINT8_COUNT) {
+  if (current->localCount == 1000) {
     error("Too many local variables in function.");
     return;
   }
@@ -810,14 +810,36 @@ static void namedVariable(Token name, bool canAssign) {
     emitBytes(OP_SET_GLOBAL, arg);
 */
 //> Local Variables emit-set
-    emitBytes(setOp, (uint8_t)arg);
+    if(setOp == OP_SET_LOCAL && arg> 255){ //if local var
+        emitByte(OP_SET_LOCAL_LONG);// VM uses LONG implementation
+        emitByte(arg /256);// writes first byte of position
+        emitByte(arg % 256);// writes second byte of position
+
+    }
+    else{
+        emitBytes(setOp, (uint8_t)arg);
+    }
+
 //< Local Variables emit-set
   } else {
 /* Global Variables named-variable < Local Variables emit-get
     emitBytes(OP_GET_GLOBAL, arg);
 */
 //> Local Variables emit-get
-    emitBytes(getOp, (uint8_t)arg);
+    //emitBytes(getOp, (uint8_t)arg);
+    if(getOp == OP_GET_LOCAL && arg> 255){ //if local var
+        emitByte(OP_GET_LOCAL_LONG);// VM uses LONG implementation
+        emitByte(arg /256);// writes first byte of position
+        emitByte(arg % 256);// writes second byte of position
+
+    }
+    else{
+        emitBytes(getOp, (uint8_t)arg);
+    }
+
+
+
+
 //< Local Variables emit-get
   }
 //< named-variable
@@ -1148,7 +1170,9 @@ static void function(FunctionType type) {
 
   for (int i = 0; i < function->upvalueCount; i++) {
     emitByte(compiler.upvalues[i].isLocal ? 1 : 0);
-    emitByte(compiler.upvalues[i].index);
+    emitByte(compiler.upvalues[i].index /256);// first byte
+    emitByte(compiler.upvalues[i].index % 256);// second byte for greater than 255 position
+    //emitByte(compiler.upvalues[i].index);
   }
 //< Closures capture-upvalues
 }

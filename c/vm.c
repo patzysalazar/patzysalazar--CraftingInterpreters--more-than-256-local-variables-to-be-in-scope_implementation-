@@ -590,6 +590,26 @@ static InterpretResult run() {
 //< Calls and Functions set-local
         break;
       }
+
+      case OP_GET_LOCAL_LONG : {// get variable
+      // indexPosition = where local var value is stored on vm stack
+        int indexPosition = READ_BYTE();// reads one byte - 0-255 numbers
+        indexPosition = (indexPosition * 256)+ READ_BYTE();// reads 2 byte
+        //2 bytes combined to calculate local var stack position greater than 255
+        push(frame->slots[indexPosition]);// gets local value and pushes to stack
+        break;
+
+      }
+
+      case OP_SET_LOCAL_LONG : {// set variable
+      // indexPosition = where local var value is stored on vm stack
+        int indexPosition = READ_BYTE();// reads one byte - 0-255 numbers
+        indexPosition = (indexPosition * 256)+ READ_BYTE();// reads 2 byte
+         //2 bytes combined to calculate local var stack position greater than 255
+        frame->slots[indexPosition] = peek(0);// assigns new value to local var on stack
+        break;
+
+      }
 //< Local Variables interpret-set-local
 //> Global Variables interpret-get-global
       case OP_GET_GLOBAL: {
@@ -845,7 +865,8 @@ static InterpretResult run() {
 //> interpret-capture-upvalues
         for (int i = 0; i < closure->upvalueCount; i++) {
           uint8_t isLocal = READ_BYTE();
-          uint8_t index = READ_BYTE();
+          int index = READ_BYTE();
+          index = (index * 256) + READ_BYTE();
           if (isLocal) {
             closure->upvalues[i] =
                 captureUpvalue(frame->slots + index);
